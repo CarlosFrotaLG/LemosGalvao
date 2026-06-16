@@ -4,14 +4,84 @@ import sqlite3
 import numpy as np
 from datetime import datetime
 import unicodedata
-import io # 🚀 NOVA BIBLIOTECA PARA GERAR O EXCEL NA HORA
+import io 
 
 # ==========================================
-# ⚙️ CONFIGURAÇÃO E FUNÇÕES DE FORMATAÇÃO
+# ⚙️ CONFIGURAÇÃO DA PÁGINA
 # ==========================================
-st.set_page_config(page_title="Sistema Financeiro Mestre", layout="wide")
-st.title("📊 Painel Financeiro Mestre")
+st.set_page_config(page_title="Sistema Financeiro | Lemos Galvão", layout="wide")
 
+# ==========================================
+# 🎨 IDENTIDADE VISUAL - LEMOS GALVÃO
+# ==========================================
+# Tenta carregar o logótipo se ele existir na pasta
+try:
+    st.image("logo_chaves.png", width=200) 
+except:
+    pass
+
+st.title("📊 Painel Financeiro Executivo")
+
+# Injeção do Código de Cores da Empresa
+st.markdown("""
+    <style>
+        /* Cor de fundo do painel inteiro (#F0EFF4) */
+        .stApp {
+            background-color: #F0EFF4;
+        }
+        
+        /* Cor dos Títulos Principais e Texto (#222320) */
+        h1, h2, h3, h4, h5, h6, p, label {
+            color: #222320 !important;
+            font-family: 'Georgia', serif;
+        }
+        
+        /* Estilização das Métricas (Os números grandes de Caixa e Receita) com Dourado Suave (#BEB6A1) */
+        [data-testid="stMetricValue"] {
+            color: #BEB6A1 !important; 
+            font-weight: bold;
+        }
+        
+        /* Cor da linha de separação (Divider) */
+        hr {
+            border-bottom: 2px solid #BEB6A1 !important;
+        }
+        
+        /* Botões de Ação (Grafite #3E3F3A) */
+        .stButton>button {
+            background-color: #3E3F3A;
+            color: #F0EFF4 !important;
+            border-radius: 8px;
+            border: 1px solid #BEB6A1;
+            transition: 0.3s;
+            font-weight: bold;
+        }
+        
+        /* Efeito ao passar o rato nos botões */
+        .stButton>button:hover {
+            background-color: #BEB6A1;
+            color: #222320 !important;
+            border: 1px solid #222320;
+        }
+        
+        /* Estilização das abas (Tabs) */
+        .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #3E3F3A;
+        }
+        
+        /* Linha inferior da aba selecionada */
+        .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] {
+            border-bottom-color: #BEB6A1 !important;
+            border-bottom-width: 4px !important;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+# ==========================================
+# FUNÇÕES DE FORMATAÇÃO E EXPORTAÇÃO
+# ==========================================
 def formata_moeda(valor):
     try:
         if pd.isna(valor) or valor == '': return "-"
@@ -23,7 +93,6 @@ def normalizar_nome(nome):
     nfd = unicodedata.normalize('NFD', str(nome))
     return nfd.encode('ascii', 'ignore').decode('utf8').upper().strip()
 
-# 🚀 FUNÇÃO MÁGICA PARA GERAR EXCEL
 def converter_df_para_excel(df):
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
@@ -232,36 +301,36 @@ else:
 # 🌟 AS 5 ABAS DO SISTEMA
 # ==========================================
 aba1, aba2, aba3, aba4, aba5 = st.tabs([
-    "📊 Dashboard Executivo (BI)", "📄 Auditoria (Bruta)", "💰 Motor Comercial", "🏢 Motor Plataforma", "🔍 ELO FINAL"
+    "📊 Dashboard Executivo", "📄 Auditoria (Bruta)", "💰 Motor Comercial", "🏢 Motor Plataforma", "🔍 ELO FINAL"
 ])
 
 # ------------------------------------------
 # ABA 1: DASHBOARD EXECUTIVO
 # ------------------------------------------
 with aba1:
-    st.header("📊 Visão de Negócio & BI")
     if not df_vendas.empty:
-        df_dash = df_motor.copy()
-        df_dash['Mês/Ano Venda'] = df_dash['Data da Venda'].dt.to_period('M').astype(str)
+        df_dash_base = df_motor.copy()
+        df_dash_base['Mês/Ano Venda'] = df_dash_base['Data da Venda'].dt.to_period('M').astype(str)
         
-        st.markdown("### 🔎 Filtros Globais")
+        st.markdown("### 🔎 Filtros Globais (Finanças e Produção)")
         colF1, colF2, colF3 = st.columns(3)
-        lista_empresas = ["Todas as Empresas"] + list(df_dash['Empresa Vendedora'].dropna().unique())
+        lista_empresas = ["Todas as Empresas"] + list(df_dash_base['Empresa Vendedora'].dropna().unique())
         f_empresa = colF1.selectbox("Filtrar por Empresa:", lista_empresas)
         
-        if not df_dash['Data da Venda'].dropna().empty:
-            min_date = df_dash['Data da Venda'].dropna().min().date()
-            max_date = df_dash['Data da Venda'].dropna().max().date()
+        if f_empresa != "Todas as Empresas":
+            df_dash_base = df_dash_base[df_dash_base['Empresa Vendedora'] == f_empresa]
+
+        if not df_dash_base['Data da Venda'].dropna().empty:
+            min_date = df_dash_base['Data da Venda'].dropna().min().date()
+            max_date = df_dash_base['Data da Venda'].dropna().max().date()
         else:
             min_date = datetime.today().date()
             max_date = datetime.today().date()
             
-        f_data_inicio = colF2.date_input("Período Inicial:", min_date)
-        f_data_fim = colF3.date_input("Período Final:", max_date)
+        f_data_inicio = colF2.date_input("Período Inicial (Geral):", min_date)
+        f_data_fim = colF3.date_input("Período Final (Geral):", max_date)
         
-        if f_empresa != "Todas as Empresas":
-            df_dash = df_dash[df_dash['Empresa Vendedora'] == f_empresa]
-        df_dash = df_dash[(df_dash['Data da Venda'].dt.date >= f_data_inicio) & (df_dash['Data da Venda'].dt.date <= f_data_fim)]
+        df_dash = df_dash_base[(df_dash_base['Data da Venda'].dt.date >= f_data_inicio) & (df_dash_base['Data da Venda'].dt.date <= f_data_fim)]
 
         st.divider()
 
@@ -325,28 +394,42 @@ with aba1:
 
         st.divider()
 
+        # ==========================================
+        # 🏆 SEÇÃO 4: RANKINGS COM FILTRO INDEPENDENTE
+        # ==========================================
         st.subheader("🏆 4. Rankings de Produção")
+        
+        st.markdown("##### 📅 Filtro Exclusivo para os Rankings")
+        colR1, colR2, colR3 = st.columns([1, 1, 2])
+        
+        f_data_inicio_rank = colR1.date_input("Início (Ranking):", min_date, key="rank_inicio")
+        f_data_fim_rank = colR2.date_input("Final (Ranking):", max_date, key="rank_fim")
+        
+        df_rank = df_dash_base[(df_dash_base['Data da Venda'].dt.date >= f_data_inicio_rank) & (df_dash_base['Data da Venda'].dt.date <= f_data_fim_rank)]
+
         colA, colB = st.columns(2)
         
         with colA:
             st.markdown("#### 🏢 Top Empresas")
-            if not df_dash.empty:
-                rank_emp = df_dash.groupby('Empresa Vendedora')['Crédito Numérico'].sum().reset_index()
+            if not df_rank.empty:
+                rank_emp = df_rank.groupby('Empresa Vendedora')['Crédito Numérico'].sum().reset_index()
                 rank_emp.columns = ['Empresa', 'Volume Produzido']
                 rank_emp = rank_emp.sort_values(by='Volume Produzido', ascending=False).reset_index(drop=True)
                 rank_emp.index = rank_emp.index + 1 
                 rank_emp_format = rank_emp.copy()
                 rank_emp_format['Volume Produzido'] = rank_emp_format['Volume Produzido'].apply(formata_moeda)
                 st.dataframe(rank_emp_format, use_container_width=True)
+            else:
+                st.info("Sem vendas no período do ranking.")
 
         with colB:
-            col_consultor = next((col for col in df_dash.columns if 'CONSULT' in col.upper()), None)
+            col_consultor = next((col for col in df_rank.columns if 'CONSULT' in col.upper()), None)
             if not col_consultor:
-                col_consultor = next((col for col in df_dash.columns if ('VENDED' in col.upper() or 'CORRET' in col.upper()) and 'EMPRESA' not in col.upper() and 'NÍVEL' not in col.upper() and 'NIVEL' not in col.upper()), None)
+                col_consultor = next((col for col in df_rank.columns if ('VENDED' in col.upper() or 'CORRET' in col.upper()) and 'EMPRESA' not in col.upper() and 'NÍVEL' not in col.upper() and 'NIVEL' not in col.upper()), None)
             
             st.markdown(f"#### 👤 Top Consultores VIP")
-            if col_consultor and not df_dash.empty:
-                df_cons = df_dash.copy()
+            if col_consultor and not df_rank.empty:
+                df_cons = df_rank.copy()
                 df_cons['NOME_FILTRADO'] = df_cons[col_consultor].apply(normalizar_nome)
                 df_cons = df_cons[df_cons['NOME_FILTRADO'].isin(vip_list)]
                 
@@ -360,7 +443,7 @@ with aba1:
                     rank_formatado = rank_cons.copy()
                     rank_formatado['Volume Produzido'] = rank_formatado['Volume Produzido'].apply(formata_moeda)
                     st.dataframe(rank_formatado, use_container_width=True)
-                else: st.info("Sem vendas vinculadas aos VIPs.")
+                else: st.info("Sem vendas vinculadas aos VIPs neste período.")
     else: st.warning("Sem dados.")
 
 # ------------------------------------------
@@ -381,9 +464,8 @@ with aba3:
                 df_com_visual['Valor Previsto'] = df_com_visual['Valor Previsto'].apply(formata_moeda)
                 st.dataframe(df_com_visual, use_container_width=True, height=500)
                 
-                # 🚀 BOTÃO DE DOWNLOAD EXCEL (COMERCIAL)
                 excel_comercial = converter_df_para_excel(df_com_visual)
-                st.download_button(label="📥 Exportar Comercial para Excel", data=excel_comercial, file_name="Previsao_Comercial.xlsx", mime="application/vnd.ms-excel", type="primary")
+                st.download_button(label="📥 Exportar Comercial", data=excel_comercial, file_name="Previsao_Comercial.xlsx", mime="application/vnd.ms-excel")
 
 with aba4:
     st.subheader("Fluxo Plataforma Projetado")
@@ -396,15 +478,14 @@ with aba4:
                 df_plat_visual['Valor Previsto'] = df_plat_visual['Valor Previsto'].apply(formata_moeda)
                 st.dataframe(df_plat_visual, use_container_width=True, height=500)
                 
-                # 🚀 BOTÃO DE DOWNLOAD EXCEL (PLATAFORMA)
                 excel_plataforma = converter_df_para_excel(df_plat_visual)
-                st.download_button(label="📥 Exportar Plataforma para Excel", data=excel_plataforma, file_name="Previsao_Plataforma.xlsx", mime="application/vnd.ms-excel", type="primary")
+                st.download_button(label="📥 Exportar Plataforma", data=excel_plataforma, file_name="Previsao_Plataforma.xlsx", mime="application/vnd.ms-excel")
 
 with aba5:
     st.subheader("🔍 Auditoria Definitiva (Bancorbrás vs. O Nosso Motor)")
     mostrar = st.radio("Filtro de Resultados:", ["🚨 Mostrar Apenas Divergências", "✅ Mostrar Toda a Auditoria"], horizontal=True, key="filtro_auditoria")
     
-    if st.button("⚡ EXECUTAR CRUZAMENTO FINAL", use_container_width=True, type="primary"):
+    if st.button("⚡ EXECUTAR CRUZAMENTO FINAL", use_container_width=True):
         st.session_state['cruzamento_ativo'] = True 
         
     if st.session_state.get('cruzamento_ativo', False):
@@ -441,7 +522,7 @@ with aba5:
                     pr = round(row['Valor Previsto'], 2)
                     d = round(row['Diferença (R$)'], 2)
                     if p == pr: return "✅ TUDO CERTO"
-                    if p > 0 and pr == 0: return "🚨 RECEBEDOR ERRADO (Ou Maior)"
+                    if p > 0 and pr == 0: return "🚨 RECEBEDOR ERRADO"
                     if p == 0 and pr > 0: return "❌ FALTA RECEBER"
                     if d < 0: return "⚠️ PAGO A MENOR"
                     return "⚠️ PAGO A MAIOR"
@@ -458,7 +539,6 @@ with aba5:
                     if 'FALTA' in s: return ['background-color: #FFF3CD; color: #856404; font-weight: bold;'] * len(linha)
                     return ['background-color: #FFEeba; color: #856404;'] * len(linha)
                 
-                # Salvamos uma cópia limpa do DataFrame para o Excel (antes de virar texto de moeda)
                 df_final_excel = df_final.copy()
                 
                 df_final['Valor Pago'] = df_final['Valor Pago'].apply(formata_moeda)
@@ -468,6 +548,5 @@ with aba5:
                 st.success(f"🎯 Cruzamento concluído! O Motor auditou {len(df_final)} registos.")
                 st.dataframe(df_final.style.apply(pintar_status, axis=1), use_container_width=True, height=600)
                 
-                # 🚀 BOTÃO DE DOWNLOAD EXCEL (AUDITORIA / ELO FINAL)
                 excel_auditoria = converter_df_para_excel(df_final_excel)
-                st.download_button(label="📥 Exportar Relatório de Auditoria para Excel", data=excel_auditoria, file_name="Auditoria_Bancorbras.xlsx", mime="application/vnd.ms-excel", type="primary")
+                st.download_button(label="📥 Exportar Auditoria", data=excel_auditoria, file_name="Auditoria.xlsx", mime="application/vnd.ms-excel")
