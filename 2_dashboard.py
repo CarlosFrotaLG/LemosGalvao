@@ -11,7 +11,48 @@ import io
 st.set_page_config(page_title="Sistema Financeiro | Lemos Galvão", layout="wide", initial_sidebar_state="expanded")
 
 # ==========================================
-# IDENTIDADE VISUAL & CSS AVANÇADO
+# 🔐 SISTEMA DE LOGIN E SEGURANÇA
+# ==========================================
+# Altere os utilizadores e senhas conforme a sua necessidade corporativa
+USUARIOS_PERMITIDOS = {
+    "Carlos.Frota": "Lg#2026",
+    "Valeria.Oliveira": "Lg@2026",
+    "Klaus.Meirose": "Lg$2026",
+    "Leandro.Galvão": "Lg*2026"
+}
+
+if 'autenticado' not in st.session_state:
+    st.session_state['autenticado'] = False
+
+# Se não estiver autenticado, mostra a tela de login e PARA a execução do resto do painel
+if not st.session_state['autenticado']:
+    st.markdown("<br><br><br>", unsafe_allow_html=True)
+    col1, col2, col3 = st.columns([1, 1, 1])
+    
+    with col2:
+        try:
+            st.image("logo_chaves.png", use_container_width=True) # Usa a logo que você já tem
+        except:
+            pass
+        st.markdown("<h2 style='text-align: center; color: #0F1C2E; font-family: \"Georgia\", serif;'>Acesso Restrito</h2>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center; color: #3E3F3A;'>Insira as suas credenciais para aceder ao Painel Financeiro.</p>", unsafe_allow_html=True)
+        
+        usuario_input = st.text_input("Usuário")
+        senha_input = st.text_input("Senha", type="password")
+        
+        if st.button("Entrar no Sistema", use_container_width=True, type="primary"):
+            if usuario_input in USUARIOS_PERMITIDOS and USUARIOS_PERMITIDOS[usuario_input] == senha_input:
+                st.session_state['autenticado'] = True
+                st.rerun() # Recarrega a página, agora com o acesso liberado
+            else:
+                st.error("Credenciais inválidas. Tente novamente.")
+    
+    # O comando abaixo impede que o resto do código seja lido ou executado sem login
+    st.stop()
+
+
+# ==========================================
+# IDENTIDADE VISUAL & CSS AVANÇADO (APÓS LOGIN)
 # ==========================================
 st.markdown("""
     <style>
@@ -152,7 +193,7 @@ if not df_vendas.empty and 'Empresa Vendedora' in df_vendas.columns:
     df_vendas['Empresa Vendedora'] = df_vendas['Empresa Vendedora'].astype(str).str.strip().str.upper().replace(map_empresas)
 
 # ==========================================
-# MOTORES DE CÁLCULO (INJEÇÃO DE CLIENTE)
+# MOTORES DE CÁLCULO
 # ==========================================
 @st.cache_data
 def processar_motor_comercial(df_cruzado, df_promo):
@@ -329,6 +370,12 @@ with st.sidebar.expander("PREVISÃO DE RECEITA", expanded=False):
 with st.sidebar.expander("RECEBIMENTOS", expanded=False):
     if st.button("Cadastro de Recebimentos", use_container_width=True, key="btn_rec1"): navegar("Cadastro de Recebimentos")
     if st.button("Auditoria Definitiva", use_container_width=True, key="btn_rec2"): navegar("Auditoria Definitiva")
+
+# Botão de Sair no final do menu
+st.sidebar.divider()
+if st.sidebar.button("Sair (Logout)", use_container_width=True):
+    st.session_state['autenticado'] = False
+    st.rerun()
 
 escolha = st.session_state['pagina_atual']
 
@@ -593,7 +640,7 @@ else:
             st.session_state['cruzamento_ativo'] = True 
             
         if st.session_state.get('cruzamento_ativo', False):
-            with st.spinner("A processar auditoria financeira avançada..."):
+            with st.spinner("Cruzando bancos de dados..."):
                 df_exp_com = processar_motor_comercial(df_cruzado, df_promo)
                 df_exp_plat = processar_motor_plataforma(df_cruzado, df_parceiros)
                 df_esperado = pd.concat([df_exp_com, df_exp_plat]).reset_index(drop=True)
@@ -605,10 +652,11 @@ else:
                     df_esperado['Empresa'] = df_esperado['Recebedora'].astype(str).str.strip().str.upper()
                     df_esperado['Parcela_Num'] = pd.to_numeric(df_esperado['Parcela'].astype(str).str.replace('ª', ''), errors='coerce')
                     
-                    # Prevenção 1: Resgatar Vendedora
-                    map_vendedora = df_esperado.set_index('Nº Contrato')['Empresa Vendedora'].to_dict()
+                    df_vendas_clean = df_vendas.dropna(subset=['Nº Contrato']).drop_duplicates(subset=['Nº Contrato']).copy()
+                    df_vendas_clean['Nº Contrato'] = df_vendas_clean['Nº Contrato'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip().str.upper()
+                    map_vendedora = df_vendas_clean.set_index('Nº Contrato')['Empresa Vendedora'].to_dict() if 'Empresa Vendedora' in df_vendas_clean.columns else {}
+                    map_cliente_v = df_vendas_clean.set_index('Nº Contrato')['Cliente'].to_dict() if 'Cliente' in df_vendas_clean.columns else {}
                     
-                    # Prevenção 2: Resgatar o Cliente a partir da base crua de auditoria
                     df_aud_clean = df_auditoria.dropna(subset=['Nº CONTRATO']).drop_duplicates(subset=['Nº CONTRATO']).copy()
                     df_aud_clean['Nº CONTRATO'] = df_aud_clean['Nº CONTRATO'].astype(str).str.replace(r'\.0$', '', regex=True).str.strip().str.upper()
                     col_cli_aud = next((c for c in df_aud_clean.columns if 'CLIENTE' in c.upper()), None)
@@ -616,7 +664,6 @@ else:
 
                     map_data_prev = df_esperado.groupby(['Nº Contrato', 'Parcela_Num'])['Data Prevista'].first().to_dict()
                     
-                    # Agrupamento inteligente (Agrega o Valor Previsto, mas "segura" o nome do Cliente na memória)
                     df_esperado['Cliente'] = df_esperado.get('Cliente', "Desconhecido")
                     df_esp_grp = df_esperado.groupby(['Nº Contrato', 'Parcela_Num', 'Empresa']).agg({'Valor Previsto': 'sum', 'Cliente': 'first'}).reset_index()
                     
@@ -627,17 +674,21 @@ else:
                     df_aud_grp = df_aud.groupby(['Nº Contrato', 'Parcela_Num', 'Empresa'])['VALOR PAGO'].sum().reset_index()
                     df_aud_grp.rename(columns={'VALOR PAGO': 'Valor Pago'}, inplace=True)
                     
-                    # Cruzamento Otimizado
                     df_final = pd.merge(df_aud_grp, df_esp_grp, on=['Nº Contrato', 'Parcela_Num', 'Empresa'], how='outer').reset_index(drop=True)
                     df_final['Valor Pago'] = df_final['Valor Pago'].fillna(0)
                     df_final['Valor Previsto'] = df_final['Valor Previsto'].fillna(0)
                     df_final['Diferença (R$)'] = df_final['Valor Pago'] - df_final['Valor Previsto']
                     
-                    # Injeção de Segurança
+                    def buscar_nome_cliente(contrato):
+                        nome = map_cliente_v.get(contrato)
+                        if pd.isna(nome) or not nome or str(nome).strip() == '':
+                            nome = map_cliente_a.get(contrato)
+                        if pd.isna(nome) or not nome or str(nome).strip() == '':
+                            return "Desconhecido"
+                        return str(nome).strip()
+
                     df_final['Empresa Vendedora'] = df_final['Nº Contrato'].map(map_vendedora).fillna("N/A")
-                    df_final['Cliente'] = df_final.apply(
-                        lambda x: map_cliente_a.get(x['Nº Contrato'], "Desconhecido") if pd.isna(x.get('Cliente')) else x['Cliente'], axis=1
-                    )
+                    df_final['Cliente'] = df_final['Nº Contrato'].apply(buscar_nome_cliente)
                     
                     df_final['Data Prevista'] = df_final.set_index(['Nº Contrato', 'Parcela_Num']).index.map(map_data_prev)
                     df_final['Data Prevista'] = pd.to_datetime(df_final['Data Prevista'], errors='coerce')
@@ -658,7 +709,6 @@ else:
                     
                     st.divider()
                     
-                    # --- FILTROS SUPERIORES ---
                     c1, c2, c3 = st.columns(3)
                     
                     vendedoras_lista = sorted([str(v) for v in df_final['Empresa Vendedora'].unique() if pd.notna(v)])
@@ -669,7 +719,6 @@ else:
                     f_rec = c2.selectbox("Empresa que Recebe:", ["Todas"] + recebedoras_lista)
                     f_status = c3.selectbox("Status da Auditoria:", ["Todos", "Apenas Divergências"] + status_lista)
                     
-                    # --- FILTROS INFERIORES ---
                     c4, c5, c6 = st.columns(3) 
                     meses_disponiveis = [m for m in df_final['Mês Ref'].unique() if m != 'Sem Previsão']
                     meses_disponiveis = sorted(meses_disponiveis, key=lambda x: datetime.strptime(x, '%m/%Y'), reverse=True)
@@ -678,7 +727,6 @@ else:
                     f_mes = c4.selectbox("Período (Mês Previsto):", opcoes_mes)
                     f_cliente = c5.text_input("Buscar por Cliente (Digite parte do nome):")
                     
-                    # Aplicando os filtros
                     if f_vend != "Todas": df_final = df_final[df_final['Empresa Vendedora'] == f_vend]
                     if f_rec != "Todas": df_final = df_final[df_final['Empresa'] == f_rec]
                     
@@ -694,7 +742,6 @@ else:
                         df_final = df_final[df_final['Cliente_Norm'].str.contains(termo_busca, na=False, regex=False)]
                         df_final = df_final.drop(columns=['Cliente_Norm'])
                     
-                    # --- RESUMO LG ---
                     df_lg = df_final[df_final['Empresa'].str.contains('LG', na=False) & (df_final['Diferença (R$)'].round(2) != 0)]
                     if not df_lg.empty:
                         st.markdown("<h3>Resumo de Ajustes - Grupo LG</h3>", unsafe_allow_html=True)
@@ -705,7 +752,6 @@ else:
                         c_lg1, c_lg2, c_lg3 = st.columns([1, 2, 1])
                         with c_lg2: st.dataframe(estilizar_tabela(resumo_lg, tudo_centro=True), use_container_width=True, hide_index=True)
                     
-                    # --- TABELA ANALÍTICA DE CRUZAMENTO ---
                     st.markdown("<h3>Tabela Analítica de Cruzamento</h3>", unsafe_allow_html=True)
                     df_tela = df_final[['Nº Contrato', 'Cliente', 'Parcela_Num', 'Mês Ref', 'Empresa Vendedora', 'Empresa', 'Valor Previsto', 'Valor Pago', 'Diferença (R$)', 'Status']].copy()
                     df_tela.columns = ['Nº Contrato', 'Cliente', 'Parcela', 'Mês Previsão', 'Vendedora Originária', 'Recebedora', 'Valor Previsto', 'Valor Pago', 'Diferença', 'Status']
